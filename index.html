@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omnis</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Add Font Awesome for thumbs up/down icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Vanta.js background effect -->
+    <div id="vanta-bg"></div>
+    
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="app-title">Omnis</div>
+        <div class="hamburger" id="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+    
+    <!-- Menu dialog -->
+    <div class="menu-dialog">
+        <h3>Menu</h3>
+        <ul>
+            <li>About</li>
+            <li>Settings</li>
+            <li>Clear Chat</li>
+            <li>Help</li>
+        </ul>
+    </div>
+    
+    <!-- Chat messages container -->
+    <div id="chat-messages">
+        <div class="chat-message bot">
+            <div class="message-content">
+                Hi! I'm Omnis, your AI assistant. How can I help you today?
+            </div>
+            <div class="message-actions">
+                <div class="rating">
+                    <button class="rating-btn" onclick="rateMessage(this, 'up')"><i class="fas fa-thumbs-up"></i></button>
+                    <button class="rating-btn" onclick="rateMessage(this, 'down')"><i class="fas fa-thumbs-down"></i></button>
+                </div>
+                <button class="speak-btn" onclick="speakMessage(this)"><i class="fas fa-volume-up"></i></button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Input area -->
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button id="voice-input-btn" onclick="toggleVoiceInput()"><i class="fas fa-microphone"></i></button>
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r121/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.halo.min.js"></script>
+    <script>
+        // Voice recognition variables
+        let recognition = null;
+        let isListening = false;
+        let speechSynthesis = window.speechSynthesis;
+        let currentSpeech = null;
+        
+        // Initialize speech recognition
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('user-input').value = transcript;
+                    stopListening();
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Speech recognition error:', event.error);
+                    stopListening();
+                };
+                
+                recognition.onend = function() {
+                    stopListening();
+                };
+            } else {
+                console.error('Speech recognition not supported in this browser');
+                document.getElementById('voice-input-btn').disabled = true;
+                document.getElementById('voice-input-btn').title = 'Speech recognition not supported';
+            }
+        }
+        
+        // Toggle voice input
+        function toggleVoiceInput() {
+            if (!recognition) {
+                initSpeechRecognition();
+            }
+            
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+        
+        // Start listening
+        function startListening() {
+            if (recognition) {
+                recognition.start();
+                isListening = true;
+                document.getElementById('voice-input-btn').classList.add('listening');
+                document.getElementById('voice-input-btn').title = 'Listening... Click to stop';
+            }
+        }
+        
+        // Stop listening
+        function stopListening() {
+            if (recognition) {
+                recognition.stop();
+                isListening = false;
+                document.getElementById('voice-input-btn').classList.remove('listening');
+                document.getElementById('voice-input-btn').title = 'Click to start voice input';
+            }
+        }
+        
+        // Function to speak the message
+        function speakMessage(button) {
+            const messageElement = button.closest('.chat-message');
+            const messageContent = messageElement.querySelector('.message-content');
+            
+            // If already speaking this message
+            if (currentSpeech && button.classList.contains('speaking')) {
+                if (speechSynthesis.speaking) {
+                    if (speechSynthesis.paused) {
+                        // Resume speech
+                        speechSynthesis.resume();
+                        button.innerHTML = '<i class="fas fa-pause"></i>';
+                    } else {
+                        // Pause speech
+                        speechSynthesis.pause();
+                        button.innerHTML = '<i class="fas fa-play"></i>';
+                    }
+                }
+                return;
+            }
+            
+            // Stop any other speech that might be playing
+            if (currentSpeech) {
+                speechSynthesis.cancel();
+                // Reset all other speaking buttons
+                document.querySelectorAll('.speak-btn.speaking').forEach(btn => {
+                    btn.classList.remove('speaking');
+                    btn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                });
+            }
+            
+            // Get the text content, removing any HTML tags
+            const textToSpeak = messageContent.innerText || messageContent.textContent;
+            
+            // Create a new speech utterance
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            // Set properties for better speech
+            utterance.rate = 1.0;  // Speed of speech
+            utterance.pitch = 1.0; // Pitch of voice
+            utterance.volume = 1.0; // Volume
+            
+            // Add visual feedback
+            button.classList.add('speaking');
+            button.innerHTML = '<i class="fas fa-pause"></i>';
+            
+            // Handle speech end
+            utterance.onend = function() {
+                button.classList.remove('speaking');
+                button.innerHTML = '<i class="fas fa-volume-up"></i>';
+                currentSpeech = null;
+            };
+            
+            // Handle speech error
+            utterance.onerror = function() {
+                button.classList.remove('speaking');
+                button.innerHTML = '<i class="fas fa-volume-up"></i>';
+                currentSpeech = null;
+                console.error('Speech synthesis error');
+            };
+            
+            // Store current speech for cancellation
+            currentSpeech = utterance;
+            
+            // Speak the text
+            speechSynthesis.speak(utterance);
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('user-input');
+            const chatMessages = document.getElementById('chat-messages');
+        
+            if (input.value.trim() === '') return;
+        
+            // Add user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+            userMsg.innerHTML = `<div class="message-content">${input.value}</div>`;
+            chatMessages.appendChild(userMsg);
+        
+            // Add typing indicator
+            const botMsg = document.createElement('div');
+            botMsg.className = 'chat-message bot';
+            botMsg.innerHTML = `<div class="message-content">Processing your request...</div>`;
+            chatMessages.appendChild(botMsg);
+        
+            // Clear input
+            input.value = '';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Send message to backend
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: userMsg.querySelector('.message-content').textContent,
+                    agent: 'auto'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remove typing indicator
+                chatMessages.removeChild(botMsg);
+                
+                // Add bot response
+                const responseMsg = document.createElement('div');
+                responseMsg.className = 'chat-message bot';
+                
+                // Add message content
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                
+                // Check if response is structured (contains links or citations)
+                if (data.response && typeof data.response === 'string') {
+                    // Process the response to handle links and citations
+                    let processedResponse = data.response;
+                    
+                    // Handle code blocks
+                    processedResponse = processedResponse.replace(
+                        /```(\w+)?\n([\s\S]*?)```/g,
+                        (match, language, code) => {
+                            // Split code into lines and wrap each line in a span
+                            const lines = code.trim().split('\n');
+                            const formattedLines = lines.map(line => 
+                                `<span class="code-line">${line}</span>`
+                            ).join('\n');
+                            
+                            return `<pre class="code-block ${language || ''}">${formattedLines}</pre>`;
+                        }
+                    );
+                    
+                    // Check for Wikipedia citations
+                    if (processedResponse.includes('According to Wikipedia')) {
+                        // Add a Wikipedia icon next to citations
+                        processedResponse = processedResponse.replace(
+                            /According to Wikipedia/g, 
+                            '<span class="citation"><i class="fab fa-wikipedia-w"></i> According to Wikipedia</span>'
+                        );
+                    }
+                    
+                    // Check for links in the format [text](url)
+                    processedResponse = processedResponse.replace(
+                        /\[([^\]]+)\]\(([^)]+)\)/g, 
+                        '<a href="$2" target="_blank" class="response-link">$1 <i class="fas fa-external-link-alt"></i></a>'
+                    );
+                    
+                    messageContent.innerHTML = processedResponse;
+                } else {
+                    // Fallback for non-string responses
+                    messageContent.textContent = data.response;
+                }
+                
+                responseMsg.appendChild(messageContent);
+                
+                // Add image if present
+                if (data.image_path) {
+                    const imgContainer = document.createElement('div');
+                    imgContainer.className = 'image-container';
+                    const img = document.createElement('img');
+                    img.src = `/api/image/${data.image_path}`;
+                    img.alt = data.title || 'Generated chart';
+                    img.className = 'response-image';
+                    imgContainer.appendChild(img);
+                    responseMsg.appendChild(imgContainer);
+                }
+                
+                // Add rating buttons and speak button
+                const messageActions = document.createElement('div');
+                messageActions.className = 'message-actions';
+                messageActions.innerHTML = `
+                    <div class="rating">
+                        <button class="rating-btn" onclick="rateMessage(this, 'up')"><i class="fas fa-thumbs-up"></i></button>
+                        <button class="rating-btn" onclick="rateMessage(this, 'down')"><i class="fas fa-thumbs-down"></i></button>
+                    </div>
+                    <button class="speak-btn" onclick="speakMessage(this)"><i class="fas fa-volume-up"></i></button>
+                `;
+                responseMsg.appendChild(messageActions);
+                
+                chatMessages.appendChild(responseMsg);
+
+                // Add usage info if available
+                if (data.usage) {
+                    const usageInfo = document.createElement('div');
+                    usageInfo.className = 'usage-info';
+                    usageInfo.textContent = `Usage: ${data.usage.tokens} tokens ($${data.usage.cost}) | Agent: ${data.agent}`;
+                    chatMessages.appendChild(usageInfo);
+                }
+
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            })
+            .catch(error => {
+                // Remove typing indicator
+                chatMessages.removeChild(botMsg);
+                
+                // Add error message
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'chat-message bot';
+                errorMsg.innerHTML = `<div class="message-content">Sorry, I encountered an error. Please try again.</div>`;
+                chatMessages.appendChild(errorMsg);
+                console.error('Error:', error);
+            });
+        }
+        
+        // Function to handle message rating
+        function rateMessage(button, type) {
+            const messageElement = button.closest('.chat-message');
+            const ratingButtons = messageElement.querySelectorAll('.rating-btn');
+            
+            // Remove active class from all buttons
+            ratingButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Add active class to clicked button
+            button.classList.add('active');
+            
+            // Store rating in localStorage
+            const messageId = Date.now(); // Simple unique ID
+            localStorage.setItem(`rating_${messageId}`, type);
+            
+            // Optional: Send rating to backend
+            console.log(`Rated message ${messageId} as ${type}`);
+        }
+    
+        // Initialize VANTA effect after page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            VANTA.HALO({
+                el: "#vanta-bg",
+                mouseControls: true,
+                touchControls: true,
+                gyroControls: false,
+                minHeight: 200.00,
+                minWidth: 200.00,
+                baseColor: 0xff00ff,
+                backgroundColor: 0x0f0f0f,
+                color2: 0x00ffff,
+                size: 1.50,
+                xOffset: 0.25,
+                yOffset: 0.25,
+                amplitudeFactor: 1.50,
+                amplitude: 1.00,
+                maxDistance: 25.00,
+                spacing: 1.50,
+                showLines: true,
+                showPoints: true,
+                scale: 1.00,
+                scaleMobile: 1.00
+            });
+        
+            // Hamburger menu toggle
+            const hamburger = document.getElementById('hamburger');
+            const menuDialog = document.querySelector('.menu-dialog');
+        
+            hamburger.addEventListener('click', () => {
+                const isVisible = menuDialog.style.visibility === 'visible';
+                menuDialog.style.opacity = isVisible ? '0' : '1';
+                menuDialog.style.visibility = isVisible ? 'hidden' : 'visible';
+            });
+
+            // Add enter key support for sending messages
+            document.getElementById('user-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            // Initialize speech recognition
+            initSpeechRecognition();
+        });
+    </script>
+</body>
+</html> 
