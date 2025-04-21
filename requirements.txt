@@ -42,6 +42,7 @@ marshmallow
 mdurl
 multidict
 mypy-extensions
+matplotlib
 numpy
 numexpr
 openai
