@@ -391,11 +391,12 @@ def answerer_process_query(query):
     return answer_result.response
 
 if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
     print("Multi-Agent Chatbot Web Interface")
     print("=================================")
     print("Initializing agents...")
     executor, planner, replanner, answerer = initialize_agents()
     print("Agents initialized successfully!")
-    print("\nStarting web server...")
-    print("Access the web interface at: http://localhost:5000")
-    app.run(debug=True) 
+    print(f"PORT environment variable: {os.environ.get('PORT', 'Not set')}")
+    print(f"Starting web server on port: {port}")
+    app.run(host="0.0.0.0", port=port, debug=False if os.environ.get("PORT") else True)
